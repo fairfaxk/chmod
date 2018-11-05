@@ -148,17 +148,24 @@ void recursively(char* path, mode_t mode){
 
 	if(d == NULL) { perror("Couldn't open directory"); exit(1); }
 
+	if(chmod(path, mode)!=0){
+		perror("Could not change mode");
+		exit(-1);
+	}
+
 	for(de = readdir(d); de != NULL; de = readdir(d)){
 		if(string(de->d_name)!="." && string(de->d_name)!=".."){	
 			string s = string(path) + "/" + string(de->d_name);
 		
 			if(lstat(s.c_str(), &finfo) == 0){
-				if(chmod((char *) s.c_str(), mode)!=0){
-					perror("Could not change mode");
-					exit(-3);
-				}
 				if(S_ISDIR(finfo.st_mode)){
 					recursively((char *) s.c_str(), mode);
+				}
+				else{
+					if(chmod((char *) s.c_str(), mode)!=0){
+                                                perror("Could not change mode");
+                                                exit(-3);
+                                        }
 				}
 			}
 		}
