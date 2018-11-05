@@ -20,11 +20,15 @@ bool r = false;
 bool w = false;
 bool x = false;
 
+bool absolute = false;
+
 DIR* d;
 
 char* filename;
 
 struct stat finfo;
+
+mode_t permission = 0;
 
 void parsePermissions(string permissions){
 	size_t plusminus;
@@ -86,8 +90,6 @@ void parsePermissions(string permissions){
 
 void setPermissions(char* file){
 	if(stat(file, &finfo)==0){
-		mode_t permission = 0;
-
 		if(u){
 			if(r){
 				permission = (permission | S_IRUSR);
@@ -123,24 +125,43 @@ void setPermissions(char* file){
 		}
 		if(plusbit){
 			permission = (permission | finfo.st_mode);
-			if(chmod(file, permission)!=0){
-				perror("Could not change permission");
-				exit(-1);
-			}
 		}
 		else if(minusbit){
 			permission = ~permission;
 			permission = (permission & finfo.st_mode);
-			
-                        if(chmod(file, permission)!=0){
-                                perror("Could not change permission");
-				exit(-1);
-                        }
 		}
 	}
 	else{
 		perror("Couldnt get current mode of file");
 		exit(-1);
+	}
+}
+
+void recursively(char* path, mode_t mode){
+	struct stat finfo;
+	
+	DIR *d;
+	
+	struct dirent *de;
+	
+	d=opendir(path);
+
+	if(d == NULL) { perror("Couldn't open directory"); exit(1); }
+
+	for(de = readdir(d); de != NULL; de = readdir(d)){
+		if(string(de->d_name)!="." && string(de->d_name)!=".."){	
+			string s = string(path) + "/" + string(de->d_name);
+		
+			if(lstat(s.c_str(), &finfo) == 0){
+				if(chmod((char *) s.c_str(), mode)!=0){
+					perror("Could not change mode");
+					exit(-3);
+				}
+				if(S_ISDIR(finfo.st_mode)){
+					recursively((char *) s.c_str(), mode);
+				}
+			}
+		}
 	}
 }
 
@@ -183,15 +204,34 @@ int main(int argc, char *argv[]){
 			}
 			string s = string(argv[2]);
 			filename=argv[3];
+
 			//Check if it's a directory
 			if(S_ISDIR(finfo.st_mode)){
-				printf("It's a directory with r\n");
+                                if(isAbsoluteMode(s)){
+                                        mode_t mode = strtol(s.c_str(),NULL,8);
+
+                                        recursively(argv[3], mode);
+                                }
+				else{
+					parsePermissions(s);
+					setPermissions(argv[3]);
+					
+					string path = string(argv[3]);
+
+					//If path ends in /, drop the / (for formatting)
+        				if(path[path.size()-1]=='/'){
+                				path = path.substr(0, path.size()-1);
+        				}	
+			
+					recursively((char*)path.c_str(), permission);
+				}
+				//printf("It's a directory with r\n");
 			}
 			//Check if it's a file
 			else{
 				if(isAbsoluteMode(s)){
-					long mode = strtol(s.c_str(),NULL,8);
-		
+					mode_t mode = strtol(s.c_str(),NULL,8);
+
 					if(chmod(filename, mode)!=0){
 						perror("could not set mode");
 						exit(-3);
@@ -201,6 +241,10 @@ int main(int argc, char *argv[]){
 				else{
 					parsePermissions(s);
 					setPermissions(argv[3]);
+					if(chmod(argv[3], permission)!=0){
+						perror("could not set mode");
+						exit(-3);
+					}
 				}
 			}
 				
@@ -217,7 +261,7 @@ int main(int argc, char *argv[]){
 			string s = string(argv[1]);
 			//check if the mode is absolute
 			if(isAbsoluteMode(s)){
-				long mode = strtol(s.c_str(),NULL,8);
+				mode_t mode = strtol(s.c_str(),NULL,8);
 				
 				if(chmod(filename, mode)!=0){
 					perror("could not set mode");
@@ -228,6 +272,11 @@ int main(int argc, char *argv[]){
 			else{
 				parsePermissions(s);
 				setPermissions(argv[2]);
+                                if(chmod(argv[2], permission)!=0){
+                                        perror("could not set mode");
+                                        exit(-3);
+                                }
+
 			}
 		}
 		else{
