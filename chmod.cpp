@@ -20,8 +20,6 @@ bool r = false;
 bool w = false;
 bool x = false;
 
-bool absolute = false;
-
 DIR* d;
 
 char* filename;
@@ -214,25 +212,24 @@ int main(int argc, char *argv[]){
 
 			//Check if it's a directory
 			if(S_ISDIR(finfo.st_mode)){
+				string path = string(argv[3]);
+
+                                //If path ends in /, drop the / (for formatting)
+                                if(path[path.size()-1]=='/'){
+                                        path = path.substr(0, path.size()-1);
+                                }
+
                                 if(isAbsoluteMode(s)){
                                         mode_t mode = strtol(s.c_str(),NULL,8);
 
-                                        recursively(argv[3], mode);
+                                        recursively((char*)path.c_str(), mode);
                                 }
 				else{
 					parsePermissions(s);
 					setPermissions(argv[3]);
-					
-					string path = string(argv[3]);
-
-					//If path ends in /, drop the / (for formatting)
-        				if(path[path.size()-1]=='/'){
-                				path = path.substr(0, path.size()-1);
-        				}	
 			
 					recursively((char*)path.c_str(), permission);
 				}
-				//printf("It's a directory with r\n");
 			}
 			//Check if it's a file
 			else{
